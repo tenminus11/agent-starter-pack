@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+from dotenv import dotenv_values
 import asyncio
 import datetime
 import importlib
@@ -46,6 +48,7 @@ from {{cookiecutter.agent_directory}}.app_utils.gcs import create_bucket_if_not_
 warnings.filterwarnings(
     "ignore", category=FutureWarning, module="google.cloud.aiplatform"
 )
+AE_DEFAULT_ENVS = ["GOOGLE_CLOUD_PROJECT","GOOGLE_CLOUD_QUOTA_PROJECT","PORT","K_SERVICE","K_REVISION","K_CONFIGURATION","GOOGLE_APPLICATION_CREDENTIALS"]
 
 
 def generate_class_methods_from_agent(agent_instance: Any) -> list[dict[str, Any]]:
@@ -98,6 +101,26 @@ def format_env_value(value: Any) -> str:
         return f"[secret:{value['secret']}:{value['version']}]"
     return str(value)
 
+
+def load_env_to_dict(filepath):
+    try:
+        config = dotenv_values(filepath)
+        return dict(config)
+    except Exception as e:
+        print(f"Error loading {filepath}: {e}")
+        return {}
+
+def load_env_files_to_dict(files):
+    env_vars: dict[str, Any] = {}
+    env_files = [item.strip() for item in (files or "").split(",") if item.strip()]
+
+    for file in env_files:
+        filepath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../", "", file))
+        env_vars.update(load_env_to_dict(filepath))
+    
+    for key in AE_DEFAULT_ENVS:
+        env_vars.pop(key, None)
+    return env_vars
 
 def write_deployment_metadata(
     remote_agent: Any,
@@ -238,6 +261,11 @@ def setup_agent_identity(client: Any, project: str, display_name: str) -> Any:
     help="Path to requirements.txt file",
 )
 @click.option(
+    "--env-vars-file",
+    default=None,
+    help="Comma-separated list of environment variables file",
+)
+@click.option(
     "--set-env-vars",
     default=None,
     help="Comma-separated list of environment variables in KEY=VALUE format",
@@ -306,6 +334,7 @@ def deploy_agent_engine_app(
     entrypoint_module: str,
     entrypoint_object: str,
     requirements_file: str,
+    env_vars_file: str | None,
     set_env_vars: str | None,
     set_secrets: str | None,
     labels: str | None,
@@ -324,7 +353,10 @@ def deploy_agent_engine_app(
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     # Parse CLI environment variables, secrets, and labels
-    env_vars: dict[str, Any] = parse_key_value_pairs(set_env_vars)
+    env_vars: dict[str, Any] = {}
+    env_vars.update(load_env_files_to_dict(env_vars_file))
+    env_vars.update(parse_key_value_pairs(set_env_vars))
+
     secrets = parse_secrets(set_secrets)
     labels_dict = parse_key_value_pairs(labels)
 
