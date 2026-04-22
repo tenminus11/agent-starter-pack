@@ -48,8 +48,15 @@ from {{cookiecutter.agent_directory}}.app_utils.gcs import create_bucket_if_not_
 warnings.filterwarnings(
     "ignore", category=FutureWarning, module="google.cloud.aiplatform"
 )
-AE_DEFAULT_ENVS = ["GOOGLE_CLOUD_PROJECT","GOOGLE_CLOUD_QUOTA_PROJECT","PORT","K_SERVICE","K_REVISION","K_CONFIGURATION","GOOGLE_APPLICATION_CREDENTIALS"]
-
+AE_DEFAULT_ENVS = [
+    "GOOGLE_CLOUD_PROJECT",
+    "GOOGLE_CLOUD_QUOTA_PROJECT",
+    "PORT",
+    "K_SERVICE",
+    "K_REVISION",
+    "K_CONFIGURATION",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+]
 
 def generate_class_methods_from_agent(agent_instance: Any) -> list[dict[str, Any]]:
     """Generate method specifications with schemas from agent's register_operations().
@@ -102,20 +109,20 @@ def format_env_value(value: Any) -> str:
     return str(value)
 
 
-def load_env_to_dict(filepath):
+def load_env_to_dict(filepath: str) -> dict[str, str]:
     try:
         config = dotenv_values(filepath)
-        return dict(config)
+        return config if config else {}
     except Exception as e:
-        print(f"Error loading {filepath}: {e}")
+        logging.error(f"Error loading {filepath}: {e}")
         return {}
 
-def load_env_files_to_dict(files):
-    env_vars: dict[str, Any] = {}
+def load_env_files_to_dict(files: str | None) -> dict[str, str]:
+    env_vars: dict[str, str] = {}
     env_files = [item.strip() for item in (files or "").split(",") if item.strip()]
 
     for file in env_files:
-        filepath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../", "", file))
+        filepath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../", file))
         env_vars.update(load_env_to_dict(filepath))
     
     for key in AE_DEFAULT_ENVS:
@@ -263,7 +270,7 @@ def setup_agent_identity(client: Any, project: str, display_name: str) -> Any:
 @click.option(
     "--env-vars-file",
     default=None,
-    help="Comma-separated list of environment variables file",
+    help="Comma-separated list of environment variable files",
 )
 @click.option(
     "--set-env-vars",
